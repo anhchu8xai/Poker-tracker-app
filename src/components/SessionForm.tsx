@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 
@@ -13,19 +13,18 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
     date: new Date().toISOString().split("T")[0],
     venue: "",
     gameType: "NLH",
-    stakes: "",
     notes: "",
   });
 
   const [tournamentData, setTournamentData] = useState({
     buyIn: "",
     rebuyCount: "",
-    rebuyAmount: "",
     addOnCount: "",
     addOnAmount: "",
     position: "",
     totalEntrants: "",
     prize: "",
+    duration: "",
   });
 
   const [cashData, setCashData] = useState({
@@ -35,6 +34,20 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
   });
 
   const createSession = useMutation(api.sessions.createSession);
+  const venues = useQuery(api.sessions.getUniqueVenues);
+
+  const rebuyAmount = (parseFloat(tournamentData.buyIn) || 0) * (parseInt(tournamentData.rebuyCount) || 0);
+
+  useEffect(() => {
+    if (type === 'tournament') {
+      const buyIn = parseFloat(tournamentData.buyIn) || 0;
+      const rebuys = parseInt(tournamentData.rebuyCount) || 0;
+      const calculatedRebuyAmount = buyIn * rebuys;
+      // This is where you might want to set the rebuy amount in state if you had a field for it
+      // For now, we calculate it on the fly.
+    }
+  }, [tournamentData.buyIn, tournamentData.rebuyCount, type]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +58,6 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
         date: new Date(formData.date).getTime(),
         venue: formData.venue,
         gameType: formData.gameType,
-        stakes: formData.stakes,
         notes: formData.notes || undefined,
       };
 
@@ -53,7 +65,6 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
       
       if (type === "tournament") {
         const buyIn = parseFloat(tournamentData.buyIn) || 0;
-        const rebuyAmount = parseFloat(tournamentData.rebuyAmount) || 0;
         const addOnAmount = parseFloat(tournamentData.addOnAmount) || 0;
         const prize = parseFloat(tournamentData.prize) || 0;
         
@@ -70,6 +81,7 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
           position: parseInt(tournamentData.position) || undefined,
           totalEntrants: parseInt(tournamentData.totalEntrants) || undefined,
           prize: prize || undefined,
+          duration: parseInt(tournamentData.duration) || undefined,
           profit,
         };
       } else {
@@ -95,18 +107,17 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
         date: new Date().toISOString().split("T")[0],
         venue: "",
         gameType: "NLH",
-        stakes: "",
         notes: "",
       });
       setTournamentData({
         buyIn: "",
         rebuyCount: "",
-        rebuyAmount: "",
         addOnCount: "",
         addOnAmount: "",
         position: "",
         totalEntrants: "",
         prize: "",
+        duration: "",
       });
       setCashData({
         buyInAmount: "",
@@ -174,12 +185,18 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
             </label>
             <input
               type="text"
+              list="venue-suggestions"
               value={formData.venue}
               onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
               className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               placeholder="Casino name or online site"
               required
             />
+            <datalist id="venue-suggestions">
+              {venues?.map((venue) => (
+                <option key={venue} value={venue} />
+              ))}
+            </datalist>
           </div>
           
           <div>
@@ -198,19 +215,21 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
             </select>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stakes
-            </label>
-            <input
-              type="text"
-              value={formData.stakes}
-              onChange={(e) => setFormData({ ...formData, stakes: e.target.value })}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              placeholder={type === "tournament" ? "$100 buy-in" : "$1/$2"}
-              required
-            />
-          </div>
+          {type === 'cash' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stakes
+              </label>
+              <input
+                type="text"
+                value={cashData.stakes}
+                onChange={(e) => setCashData({ ...cashData, stakes: e.target.value })}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                placeholder="$1/$2"
+                required
+              />
+            </div>
+          )}
         </div>
 
         {/* Tournament Specific Fields */}
@@ -233,6 +252,19 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
                 />
               </div>
               
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Duration (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={tournamentData.duration}
+                  onChange={(e) => setTournamentData({ ...tournamentData, duration: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="240"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Prize Won ($)
@@ -293,8 +325,34 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
                 <input
                   type="number"
                   step="0.01"
-                  value={tournamentData.rebuyAmount}
-                  onChange={(e) => setTournamentData({ ...tournamentData, rebuyAmount: e.target.value })}
+                  value={rebuyAmount.toFixed(2)}
+                  className="w-full rounded-md border-gray-300 shadow-sm bg-gray-100"
+                  readOnly
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Add-ons
+                </label>
+                <input
+                  type="number"
+                  value={tournamentData.addOnCount}
+                  onChange={(e) => setTournamentData({ ...tournamentData, addOnCount: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Add-on Amount ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={tournamentData.addOnAmount}
+                  onChange={(e) => setTournamentData({ ...tournamentData, addOnAmount: e.target.value })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   placeholder="0.00"
                 />
@@ -319,11 +377,9 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
                   value={cashData.buyInAmount}
                   onChange={(e) => setCashData({ ...cashData, buyInAmount: e.target.value })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="200.00"
-                  required
+                  placeholder="500.00"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cash Out ($)
@@ -334,11 +390,9 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
                   value={cashData.cashOut}
                   onChange={(e) => setCashData({ ...cashData, cashOut: e.target.value })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="250.00"
-                  required
+                  placeholder="750.00"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Duration (minutes)
@@ -373,7 +427,7 @@ export function SessionForm({ onSuccess }: SessionFormProps) {
         <div className="flex justify-end">
           <button
             type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium"
+            className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             Add Session
           </button>

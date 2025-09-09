@@ -8,7 +8,8 @@ export const createSession = mutation({
     date: v.number(),
     venue: v.string(),
     gameType: v.string(),
-    stakes: v.string(),
+    // stakes is now optional and only for cash games
+    stakes: v.optional(v.string()), 
     buyIn: v.optional(v.number()),
     rebuyCount: v.optional(v.number()),
     rebuyAmount: v.optional(v.number()),
@@ -62,6 +63,18 @@ export const getSessions = query({
         return true;
       })
       .sort((a, b) => b.date - a.date);
+  },
+});
+
+export const getUniqueVenues = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+    const sessions = await ctx.db.query("sessions").withIndex("by_user", q => q.eq("userId", userId)).collect();
+    const venues = sessions.map((s) => s.venue);
+    return [...new Set(venues)];
   },
 });
 

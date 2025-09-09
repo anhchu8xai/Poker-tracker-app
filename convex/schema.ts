@@ -9,7 +9,6 @@ const applicationTables = {
     date: v.number(),
     venue: v.string(),
     gameType: v.string(), // "NLH", "PLO", etc.
-    stakes: v.string(), // "$1/$2", "$100 buy-in", etc.
     
     // Tournament specific
     buyIn: v.optional(v.number()),
@@ -24,9 +23,9 @@ const applicationTables = {
     // Cash game specific
     buyInAmount: v.optional(v.number()),
     cashOut: v.optional(v.number()),
-    duration: v.optional(v.number()), // in minutes
     
     // Common fields
+    duration: v.optional(v.number()), // in minutes
     profit: v.number(), // net profit/loss
     notes: v.optional(v.string()),
   })
